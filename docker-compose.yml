@@ -1,0 +1,46 @@
+version: '2.1'
+
+services:
+  app:
+    platform: linux/x86_64
+    image: 'docker-spring-boot-postgres:latest'
+    build:
+      context: .
+    container_name: app
+    ports:
+      - 8080:8080
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/url
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=mysecretpassword
+      - SPRING_DB_DRIVER=org.postgresql.Driver
+      - SPRING_ENABLE_EVENTS_SENDER=false
+    depends_on:
+      - flyway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  flyway:
+    platform: linux/x86_64
+    image: flyway/flyway
+    command: -url=jdbc:postgresql://db:5432/url -schemas=public -user=postgres -password=mysecretpassword migrate
+    volumes:
+      - ./src/main/resources/db/migration:/flyway/sql
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    platform: linux/x86_64
+    build: ./src/main/resources/db/migration
+    image: 'postgres:14.11'
+    container_name: db
+    ports:
+      - 5433:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=url
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "postgres"]
+      interval: 5s
+      timeout: 1s
+      retries: 2
